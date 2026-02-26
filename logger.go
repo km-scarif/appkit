@@ -30,9 +30,9 @@ const (
 )
 
 type LoggerConfig struct {
-	Level      string     
-	Prefix     string     
-	LoggerType LoggerType 
+	Level       string     
+	Prefix      string     
+	LoggerType  string 
 }
 
 // InitLogger returns a Logger based on the config.
@@ -40,8 +40,10 @@ type LoggerConfig struct {
 // In prod/cloud, use LoggerSlog for structured JSON.
 func InitLogger(cfg LoggerConfig) Logger {
 	cfg.Level = strings.ToLower(cfg.Level)
+    cfg.LoggerType = strings.ToLower(cfg.LoggerType)
 
-	switch cfg.LoggerType {
+    // get the logger type from the passed in string
+	switch LoggerType(cfg.LoggerType) {
 	case LoggerSlog:
 		return newSlogLogger(cfg)
 	default:

@@ -63,4 +63,10 @@ Log Levels:  (case insensitive, defaults to ERROR)
 - WARN
 - ERROR
 
+## db connections
+
+There are functions for MySQL and ODBC connections
+
+## Usage
+
 
