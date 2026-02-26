@@ -32,3 +32,35 @@ func InitConfig(appname string) Config {
     ...
 
 ```
+
+## logger
+
+### Usage
+
+Returns a Charm stdout logger
+
+Takes a struct in the following format:
+
+```go
+
+type LoggerConfig struct {
+    Level   string
+    Prefix  string
+}
+```
+
+```go
+    logger := appkit.InitLogger(appkit.LogConfig{
+        Level:  cfg.LogLevel,
+        Prefix: "my-app",
+    })
+```
+
+Log Levels:  (case insensitive, defaults to ERROR)
+
+- DEBUG
+- INFO
+- WARN
+- ERROR
+
+
