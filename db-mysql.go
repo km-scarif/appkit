@@ -42,7 +42,8 @@ func ConnectToMySQL(cfg MySQLConfig, logger Logger) (*sql.DB, error) {
         
         logger.Debug(dsn)
         // Open database connection
-        db, err := sql.Open("mysql", dsn)
+        var err error
+        db, err = sql.Open("mysql", dsn)
         // MysqlDB, err = sql.Open("mysql", cfg.FormatDSN())
         if err != nil {
             return db, fmt.Errorf("failed to open MySQL DB on [%s]: %w", cfg.Server, err)

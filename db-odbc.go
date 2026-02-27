@@ -37,7 +37,8 @@ func ConnectToODBC(cfg OdbcConfig, logger Logger) (*sql.DB, error) {
 		}
 
 		logger.Debug(dsn)
-		db, err := sql.Open("odbc", dsn)
+        var err error
+		db, err = sql.Open("odbc", dsn)
 		if err != nil {
 			return db, fmt.Errorf("failed to open ODBC DB on [%s]: %w", cfg.System, err)
 		}
