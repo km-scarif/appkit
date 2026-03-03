@@ -6,6 +6,7 @@ require (
 	github.com/alexbrainman/odbc v0.0.0-20250601004241-49e6b2bc0cf0
 	github.com/charmbracelet/log v0.4.2
 	github.com/go-sql-driver/mysql v1.9.3
+	github.com/jmoiron/sqlx v1.4.0
 )
 
 require (

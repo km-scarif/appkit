@@ -2,11 +2,11 @@ package appkit
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
 	_ "github.com/alexbrainman/odbc"
+    "github.com/jmoiron/sqlx"
 )
 
 type OdbcConfig struct {
@@ -18,10 +18,10 @@ type OdbcConfig struct {
 }
 
 // DB switcher here
-func ConnectToODBC(cfg OdbcConfig, logger Logger) (*sql.DB, error) {
+func ConnectToODBC(cfg OdbcConfig, logger Logger) (*sqlx.DB, error) {
 	logger.Debug("Connecting to DB2 ODBC Server...")
 
-	var db *sql.DB
+	var db *sqlx.DB
 
 	if cfg.DSN != "" || cfg.Driver != "" {
 
@@ -38,7 +38,7 @@ func ConnectToODBC(cfg OdbcConfig, logger Logger) (*sql.DB, error) {
 
 		logger.Debug(dsn)
         var err error
-		db, err = sql.Open("odbc", dsn)
+		db, err = sqlx.Open("odbc", dsn)
 		if err != nil {
 			return db, fmt.Errorf("failed to open ODBC DB on [%s]: %w", cfg.System, err)
 		}

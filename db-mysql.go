@@ -1,11 +1,11 @@
 package appkit
 
 import (
-	"database/sql"
 	"fmt"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+    "github.com/jmoiron/sqlx"
 
 )
 
@@ -20,11 +20,11 @@ type MySQLConfig struct {
 
 
 // Initializes a MySQL database connection
-func ConnectToMySQL(cfg MySQLConfig, logger Logger) (*sql.DB, error) {
+func ConnectToMySQL(cfg MySQLConfig, logger Logger) (*sqlx.DB, error) {
     logger.Debug("Connecting to MySQL Server...")
 
     // return var...
-    var db *sql.DB
+    var db *sqlx.DB
 
     // if the dsn isn't configured, or the server var isn't set, return an error...
     if cfg.DSN != "" || cfg.Server != "" {
@@ -43,7 +43,7 @@ func ConnectToMySQL(cfg MySQLConfig, logger Logger) (*sql.DB, error) {
         logger.Debug(dsn)
         // Open database connection
         var err error
-        db, err = sql.Open("mysql", dsn)
+        db, err = sqlx.Open("mysql", dsn)
         // MysqlDB, err = sql.Open("mysql", cfg.FormatDSN())
         if err != nil {
             return db, fmt.Errorf("failed to open MySQL DB on [%s]: %w", cfg.Server, err)
