@@ -1,13 +1,31 @@
-package appkit
+package odbc
 
 import (
 	"context"
 	"fmt"
 	"time"
+    "errors"
 
 	_ "github.com/alexbrainman/odbc"
     "github.com/jmoiron/sqlx"
 )
+
+// Logger is the minimal logging interface this package needs.
+// It is structurally compatible with appkit.Logger, so callers can pass
+// an appkit.Logger directly without any conversion.
+type Logger interface {
+	Debug(msg string, args ...any)
+	Info(msg string, args ...any)
+	Warn(msg string, args ...any)
+	Error(msg string, args ...any)
+	Debugf(format string, args ...any)
+	Infof(format string, args ...any)
+	Warnf(format string, args ...any)
+	Errorf(format string, args ...any)
+}
+
+var ErrConnectionInfoIncomplete = errors.New("odbc connection info incomplete")
+
 
 type OdbcConfig struct {
 	DSN    string
