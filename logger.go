@@ -6,6 +6,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+    "runtime"
 
 	charmlog "github.com/charmbracelet/log"
 )
@@ -23,6 +24,45 @@ type Logger interface {
 }
 
 type LoggerType string
+
+  // NamedLogger wraps a Logger with helpers that automatically prefix log
+  // output with the calling function's name (resolved at runtime via
+  // runtime.Caller). It embeds Logger so it remains a drop-in replacement —
+  // Debugf, Infof, etc. work as before; the LogXxx methods add the prefix.
+  type NamedLogger struct {
+      Logger
+  }
+
+  // NewNamedLogger wraps an existing Logger so callers get name-prefixed
+  // helpers in addition to the underlying Logger interface.
+  func NewNamedLogger(l Logger) *NamedLogger {
+      return &NamedLogger{Logger: l}
+  }
+
+  // LogErr logs err at error level prefixed with the immediate caller's
+  // function name, e.g. "RenderCriteria: provider docs retrieval failed: ...".
+  func (n *NamedLogger) LogErr(err error, msg string) {
+      n.Errorf("%s: %s: %v", callerName(2), msg, err)
+  }
+
+  // callerName returns the unqualified name of the function `skip` frames
+  // above runtime.Caller (skip=2 means the caller of the function that
+  // called callerName).
+  func callerName(skip int) string {
+      pc, _, _, ok := runtime.Caller(skip)
+      if !ok {
+          return "unknown"
+      }
+      fn := runtime.FuncForPC(pc)
+      if fn == nil {
+          return "unknown"
+      }
+      name := fn.Name()
+      if i := strings.LastIndex(name, "."); i >= 0 {
+          name = name[i+1:]
+      }
+      return name
+  }
 
 const (
 	LoggerCharm LoggerType = "charm" // colored text logging
