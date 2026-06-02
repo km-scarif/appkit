@@ -278,6 +278,68 @@ func SumWidgets(dbconn *sqlx.DB, sku string) (int, error) {
 }
 ```
 
+### Probe Server
+
+`NewProbeServer` builds a minimal, standard-library `*http.Server` for services
+that don't expose a full API — workers, schedulers, FTP jobs, etc. — but still
+need liveness/readiness endpoints for k8s, load balancers, or uptime monitoring.
+It avoids pulling Echo into a service that only needs a healthcheck.
+
+For services that need real routing, binding, or middleware, keep using Echo;
+this helper is deliberately minimal.
+
+It exposes three routes:
+
+- `GET /`        — plain HTML banner naming the service
+- `GET /up`      — liveness; always `200 "up"` while the process is serving
+- `GET /health`  — readiness; runs every configured check and returns `503` if
+  any fails, otherwise `200`, with a per-dependency breakdown in the body
+
+The returned server is configured but **not** started — the caller owns its
+lifecycle (`ListenAndServe` / `Shutdown`) so it plugs into any graceful-shutdown
+pattern.
+
+`DBHealthCheck` adapts a `*sqlx.DB` into a check by pinging it (a nil handle is
+treated as unhealthy).
+
+#### Usage
+
+```go
+import "github.com/km-scarif/appkit"
+
+server := appkit.NewProbeServer(appkit.ProbeServerConfig{
+    Port:        cfg.Port,
+    ServiceName: "km-ftpjobs",
+    LogHTTP:     cfg.LogHttp == "on",
+    Checks: map[string]appkit.HealthCheck{
+        "mysql": appkit.DBHealthCheck(mysqlDB),
+        "db2":   appkit.DBHealthCheck(db2DB),
+    },
+}, logger)
+
+go func() {
+    if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+        logger.Errorf("http server error: %s", err)
+    }
+}()
+
+// ...on shutdown:
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+defer cancel()
+_ = server.Shutdown(ctx)
+```
+
+A successful `GET /health` returns:
+
+```json
+{
+    "status": "healthy",
+    "service": "km-ftpjobs",
+    "timestamp": "2026-06-02T12:00:00Z",
+    "required_services": { "mysql": "healthy", "db2": "healthy" }
+}
+```
+
 ### Basic AppKit implementation
 
 One way to use AppKit in an application would be to use the following structure:
