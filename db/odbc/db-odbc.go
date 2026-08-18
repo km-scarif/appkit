@@ -2,12 +2,12 @@ package odbc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
-    "errors"
 
 	_ "github.com/alexbrainman/odbc"
-    "github.com/jmoiron/sqlx"
+	"github.com/jmoiron/sqlx"
 )
 
 // Logger is the minimal logging interface this package needs.
@@ -25,7 +25,6 @@ type Logger interface {
 }
 
 var ErrConnectionInfoIncomplete = errors.New("odbc connection info incomplete")
-
 
 type OdbcConfig struct {
 	DSN    string
@@ -55,7 +54,7 @@ func ConnectToODBC(cfg OdbcConfig, logger Logger) (*sqlx.DB, error) {
 		}
 
 		logger.Debug(dsn)
-        var err error
+		var err error
 		db, err = sqlx.Open("odbc", dsn)
 		if err != nil {
 			return db, fmt.Errorf("failed to open ODBC DB on [%s]: %w", cfg.System, err)
@@ -78,7 +77,7 @@ func ConnectToODBC(cfg OdbcConfig, logger Logger) (*sqlx.DB, error) {
 		logger.Infof("Connected to ODBC server [%s] successfully...", cfg.System)
 
 	} else {
-        return db, ErrConnectionInfoIncomplete
+		return db, ErrConnectionInfoIncomplete
 	}
 
 	return db, nil
