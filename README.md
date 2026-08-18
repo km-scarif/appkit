@@ -140,29 +140,10 @@ There are functions for MySQL and ODBC connections.  These functions use the fol
 - `github.com/alexbrainman/odbc`
 - `github.com/go-sql-driver/mysql`
 
-Also, there are helper functions for DB2 database access that integrate with `sqlx` for easy reading and writing to the database
-
-- `DB2TrimmedString`      for DB2 CHAR fields
-- `DB2FloatAsString`      for DB2 fields to be used as strings that are in DB2 as DECIMALS 
-- `DB2TrimmedFloat64`     for DB2 fields to be used as floats (may be INTEGERS, DECIMALS, or CHAR) 
-- `DB2TrimmedInt64`       for DB2 fields to be used as integers (may be INTEGERS, DECIMALS, or CHAR)
-- `DB2Date`               for DB2 fields that contain dates stored as DECIMAL or INTEGER
+Also, there are helper types for DB2 database access that integrate with `sqlx` for easy reading and writing to the
+database — see [DB2 Column Types](#db2-column-types) below.
 
 #### Usage
-
-Example of using as field types in a struct:
-
-```go
-type InvoiceLine struct {
-    InvoiceNumber               appkit.DB2FloatAsString      `json:"invoiceNumber"        db:"INVOICE_NUMBER"`         
-    InvoiceDate                 appkit.DB2Date               `json:"invoiceDate"          db:"INVOICE_DATE"`           
-    CustomerName                appkit.DB2TrimmedString      `json:"customerName"         db:"CUSTOMER_NAME"`          
-    ProductNumber               appkit.DB2TrimmedString      `json:"productNumber"        db:"PRODUCT_NUMBER"`         
-    Quantity                    appkit.DB2TrimmedInt64       `json:"quantity"             db:"QTY"`                    
-    Price                       appkit.DB2TrimmedFloat64     `json:"price"                db:"PRICE"`                  
-}
-
-```
 
 `base-repo.go` has generic functions to interact with a db.  
 
@@ -277,6 +258,85 @@ func SumWidgets(dbconn *sqlx.DB, sku string) (int, error) {
     return *result, nil 
 }
 ```
+
+### DB2 Column Types
+
+Reading from DB2 on the IBM i is awkward in two ways, and these types exist to absorb both so the rest of a service
+never has to think about it.
+
+**1. The data doesn't match its intent.** `CHAR` columns come back space-padded to their declared width. Values that
+are conceptually identifiers — invoice numbers, customer numbers — are stored as `DECIMAL(x,0)` rather than `INTEGER`,
+so they arrive as floats and would serialize as JSON numbers unless something intervenes. Dates are frequently stored
+as a `YYYYMMDD` number.
+
+**2. The Go type varies by column.** The ODBC driver picks the concrete Go type per column, and the full set it can
+produce (see `BaseColumn.Value` in `github.com/alexbrainman/odbc`'s `column.go`) is:
+
+| ODBC C type | Go value | Typical DB2 column |
+|---|---|---|
+| `SQL_C_BIT` | `bool` | — |
+| `SQL_C_LONG` | **`int32`** | `INTEGER`, and `CASE ... THEN 1 ELSE 0` |
+| `SQL_C_SBIGINT` | `int64` | `BIGINT` |
+| `SQL_C_DOUBLE` | `float64` | `DECIMAL` / `NUMERIC`, including `DECIMAL(x,0)` |
+| `SQL_C_CHAR` | `[]byte` | `CHAR` / `VARCHAR` |
+| `SQL_C_WCHAR` | `string` | `GRAPHIC` / unicode char |
+| `SQL_C_TYPE_TIMESTAMP` | `time.Time` | `TIMESTAMP` |
+
+`int32` is the one that catches people out — it is not one of `database/sql`'s `driver.Value` types, but this driver
+returns it anyway. **Every type below accepts the whole set that makes sense for it**, so the same field type works
+whether a column is `INTEGER` in one table and `DECIMAL(5,0)` in another. Pick a type by the JSON you want, not by the
+DB2 declaration.
+
+| Type | Use for | JSON output |
+|---|---|---|
+| `DB2TrimmedString` | `CHAR` / `VARCHAR`, or any column you want as text | string, padding trimmed |
+| `DB2AnyString` | alias for `DB2TrimmedString`; a self-documenting name for columns whose DB2 type is unknown or inconsistent | string |
+| `DB2FloatAsString` | numeric columns that are really identifiers (invoice / customer numbers) | **string** |
+| `DB2TrimmedFloat64` | numeric columns that really are numbers (prices, weights) | number |
+| `DB2TrimmedInt64` | integer columns and counts (quantities); a decimal source truncates toward zero | number |
+| `DB2Bool` | flag columns: numeric `0`/`1`, or `Y`/`N`, `T`/`F`, `TRUE`/`FALSE` | `true` / `false` |
+| `DB2Date` | dates stored as `YYYYMMDD` in any column type, or a real `TIMESTAMP` | string, `YYYY-MM-DD` |
+
+A `NULL` column scans to the zero value on every one of them — empty string, `0`, `false` — never an error.
+
+#### Usage
+
+Declare them as the field types in the model struct; `sqlx` calls `Scan` through the `db:` tag and `encoding/json`
+uses the `json:` tag on the way out.
+
+```go
+type InvoiceLine struct {
+    InvoiceNumber               appkit.DB2FloatAsString      `json:"invoiceNumber"        db:"INVOICE_NUMBER"`
+    InvoiceDate                 appkit.DB2Date               `json:"invoiceDate"          db:"INVOICE_DATE"`
+    CustomerName                appkit.DB2TrimmedString      `json:"customerName"         db:"CUSTOMER_NAME"`
+    ProductNumber               appkit.DB2TrimmedString      `json:"productNumber"        db:"PRODUCT_NUMBER"`
+    Quantity                    appkit.DB2TrimmedInt64       `json:"quantity"             db:"QTY"`
+    Price                       appkit.DB2TrimmedFloat64     `json:"price"                db:"PRICE"`
+    IsActive                    appkit.DB2Bool               `json:"isActive"             db:"IS_ACTIVE"`
+}
+```
+
+Note `DB2Bool` rather than a plain Go `bool` for the flag. A `bool` field goes through the standard library's
+`driver.Bool`, which handles `int64` and `string` but **not `int32` or `float64`** — precisely what DB2 returns for a
+`CASE ... THEN 1 ELSE 0`, so it fails at scan time with `unsupported type int32`.
+
+#### Precision limit
+
+`DECIMAL` arrives as a `float64`, which represents integers exactly only up to 2^53 (about 9.0e15, 16 digits). A
+`DECIMAL(17,0)` or wider used as an identifier has already lost precision by the time Go sees it, and no amount of
+formatting recovers it. Scan those as `DB2TrimmedString`, which keeps the driver's own text.
+
+`DB2TrimmedInt64` is safe here: `int64` and whole-number text sources are taken directly rather than being routed
+through `float64`, so a `BIGINT` past 2^53 keeps every digit.
+
+#### v0.2.1 behavior notes
+
+- `int32` support was added across all the types. This is strictly a widening — a column that scanned correctly before
+  produces the identical value, and only inputs that previously *errored* now succeed.
+- `DB2Bool` and the `DB2AnyString` alias are new.
+- `DB2FloatAsString` now marshals with full precision instead of rounding to zero decimals. Integral values (which is
+  everything in a `DECIMAL(x,0)` column) render byte-identically; a fractional value now renders as `"3.5"` where it
+  used to be silently rounded to `"4"`.
 
 ### Probe Server
 
