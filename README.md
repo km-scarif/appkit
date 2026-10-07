@@ -82,6 +82,10 @@ Log Levels:  (case insensitive, defaults to ERROR)
 - WARN
 - ERROR
 
+The Charm logger prints full 5-character level names (`DEBUG`, `INFO `, `WARN `, `ERROR`, `FATAL`)
+instead of Charm's default 4-character `DEBU`/`ERRO`/`FATA`, padded so columns stay aligned.
+This lets log aggregators like Dozzle detect and colorize the levels.
+
 There is also a function `func LogConfig(cfg any, logger Logger) {...} ` that you can use to log an envconfig to stdout.  
 The logger will mask any env vars with the tag `log:"secret"`
 
