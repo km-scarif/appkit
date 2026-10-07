@@ -102,6 +102,13 @@ func newCharmLogger(cfg LoggerConfig) Logger {
 	l := charmlog.New(os.Stdout)
 	l.SetPrefix(cfg.Prefix)
 	l.SetLevel(charmLevel(cfg.Level))
+	// Full 5-char level names (ERROR not ERRO) so Dozzle detects/colors levels;
+	// Width pads INFO/WARN so columns stay aligned.
+	styles := charmlog.DefaultStyles()
+	for lvl, s := range styles.Levels {
+		styles.Levels[lvl] = s.MaxWidth(5).Width(5)
+	}
+	l.SetStyles(styles)
 	return &charmLogger{l: l}
 }
 
