@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -38,7 +38,7 @@ func ConnectToMySQL(cfg MySQLConfig, logger Logger) (*sqlx.DB, error) {
 				cfg.User, cfg.Pwd, cfg.Server, cfg.Port, cfg.DB)
 		}
 
-		logger.Debug(dsn)
+		logger.Debug(redactDSN(dsn))
 		// Open database connection
 		var err error
 		db, err = sqlx.Open("mysql", dsn)
@@ -73,4 +73,17 @@ func ConnectToMySQL(cfg MySQLConfig, logger Logger) (*sqlx.DB, error) {
 
 	return db, nil
 
+}
+
+// redactDSN masks the password so the DSN is safe to log. An unparseable DSN
+// is not logged at all, since there is no telling where the password sits.
+func redactDSN(dsn string) string {
+	c, err := mysql.ParseDSN(dsn)
+	if err != nil {
+		return "(unparseable DSN)"
+	}
+	if c.Passwd != "" {
+		c.Passwd = "****"
+	}
+	return c.FormatDSN()
 }
