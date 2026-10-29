@@ -34,7 +34,7 @@ func ConnectToMySQL(cfg MySQLConfig, logger Logger) (*sqlx.DB, error) {
 		} else {
 			// format...
 			// user:pwd@tcp(server:port)/db?parseTime=true&loc=UTC&time_zone=%27%2B00%3A00%27
-			dsn = fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&loc=UTC&time_zone=%27%2B00%3A00%27",
+			dsn = fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&loc=UTC&time_zone=%%27%%2B00%%3A00%%27",
 				cfg.User, cfg.Pwd, cfg.Server, cfg.Port, cfg.DB)
 		}
 
